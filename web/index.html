@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DevFlashcards</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Fira+Code:wght@400;500&display=swap"
+        rel="stylesheet">
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Scenario Section -->
+        <header class="scenario-card glass-panel">
+            <h2 id="scenario-title">Loading Scenario...</h2>
+            <p id="scenario-desc">Please wait while we fetch the daily challenge.</p>
+            <p id="scenario-arch" class="arch-overview"></p>
+        </header>
+
+        <!-- Flashcard Section -->
+        <main class="flashcard-container">
+            <div class="flashcard glass-panel">
+                <div class="flashcard-header">
+                    <span class="badge">Daily Concept</span>
+                    <h1 id="card-title">Concept Title</h1>
+                </div>
+
+                <div class="flashcard-content">
+                    <div class="question-box">
+                        <h3>Question</h3>
+                        <p id="card-question">...</p>
+                    </div>
+
+                    <div class="answer-box hidden" id="answer-section">
+                        <h3>Answer</h3>
+                        <p id="card-answer">...</p>
+
+                        <div class="details-grid">
+                            <div class="detail-item">
+                                <h4>Explanation</h4>
+                                <p id="card-description">...</p>
+                            </div>
+                            <div class="detail-item">
+                                <h4>Visual</h4>
+                                <div class="visual-content" id="card-visual">...</div>
+                            </div>
+                        </div>
+
+                        <div class="code-block">
+                            <h4>Code Example</h4>
+                            <pre><code id="card-code">...</code></pre>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flashcard-actions">
+                    <button id="btn-reveal" class="btn primary">Reveal Answer</button>
+                    <button id="btn-next" class="btn secondary hidden">Next Card &rarr;</button>
+                </div>
+            </div>
+        </main>
+
+        <!-- Chat Section -->
+        <aside class="chat-panel glass-panel">
+            <div class="chat-header">
+                <h3>AI Assistant</h3>
+            </div>
+            <div class="chat-messages" id="chat-messages">
+                <div class="message bot">
+                    <p>Hello! I'm here to help you understand today's scenario. Ask me anything!</p>
+                </div>
+            </div>
+            <div class="chat-input-area">
+                <input type="text" id="chat-input" placeholder="Ask a question..." autocomplete="off">
+                <button id="btn-send" class="btn-icon">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" />
+                    </svg>
+                </button>
+            </div>
+        </aside>
+    </div>
+
+    <!-- Credentials Modal -->
+    <div id="credentials-modal" class="modal hidden">
+        <div class="modal-content glass-panel">
+            <h2>Configure Credentials</h2>
+            <p>Please enter your StackSpot credentials to continue.</p>
+            <form id="credentials-form">
+                <div class="form-group">
+                    <label for="stk-client-id">Client ID</label>
+                    <input type="text" id="stk-client-id" required>
+                </div>
+                <div class="form-group">
+                    <label for="stk-client-key">Client Key</label>
+                    <input type="password" id="stk-client-key" required>
+                </div>
+                <div class="form-group">
+                    <label for="stk-realm">Realm</label>
+                    <input type="text" id="stk-realm" required>
+                </div>
+                <button type="submit" class="btn primary">Save & Continue</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+
+</html>

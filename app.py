@@ -1,0 +1,49 @@
+import os
+import threading
+import time
+import sys
+from flask import Flask
+import webview
+from backend.api import api_bp, load_daily_challenge, app_state
+
+# Initialize Flask
+server = Flask(__name__, static_folder='web', static_url_path='')
+server.register_blueprint(api_bp)
+
+def verify_date_loop():
+    """Background thread to check for date changes."""
+    while True:
+        time.sleep(300)  # Check every 5 minutes
+        # In a real app, we would check if the date has changed.
+        # For this prototype, we'll just print a heartbeat.
+        print("Checking date...", file=sys.stderr)
+        # Logic to reload if date changed:
+        # current_day = ...
+        # if current_day != app_state["current_date"]:
+        #     load_daily_challenge()
+
+def start_server():
+    """Starts the Flask server."""
+    # Run on a specific port, e.g., 5000. 
+    # Threaded=True is important for pywebview to work smoothly if not using the built-in server bridge in a complex way,
+    # but pywebview often runs the server in a separate thread or process.
+    # Here we run Flask in a thread.
+    server.run(host='127.0.0.1', port=5000, threaded=True)
+
+if __name__ == '__main__':
+    # Load initial data in background
+    print("Starting background data load...", file=sys.stderr)
+    t_load = threading.Thread(target=load_daily_challenge, daemon=True)
+    t_load.start()
+
+    # Start date verification thread
+    t = threading.Thread(target=verify_date_loop, daemon=True)
+    t.start()
+
+    # Start Flask in a separate thread
+    t_server = threading.Thread(target=start_server, daemon=True)
+    t_server.start()
+
+    # Create WebView window
+    webview.create_window('DevFlashcards', 'http://127.0.0.1:5000/index.html', width=1200, height=800, resizable=True)
+    webview.start(debug=False)
