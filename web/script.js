@@ -114,6 +114,20 @@ async function loadCurrentFlashcard() {
     }
 }
 
+// Load Chat History
+async function loadChatHistory() {
+    chatMessages.innerHTML = ''; // Clear existing messages
+    try {
+        const res = await fetch(`${API_BASE}/chat/history`);
+        const messages = await res.json();
+        messages.forEach(msg => {
+            addMessage(msg.content, msg.role === 'bot' ? 'bot' : 'user');
+        });
+    } catch (err) {
+        console.error("Failed to load chat history", err);
+    }
+}
+
 // Render Flashcard
 function renderFlashcard(data) {
     if (!data || !data.title) return;
@@ -133,6 +147,9 @@ function renderFlashcard(data) {
     cardDescription.textContent = data.detailed_explanation || data.description;
     cardVisual.textContent = data.visual_example;
     cardCode.textContent = data.code_example;
+
+    // Load chat history for this card
+    loadChatHistory();
 }
 
 // Reveal Answer
@@ -169,16 +186,60 @@ async function sendMessage() {
     addMessage(text, 'user');
     chatInput.value = '';
 
+    // Create a placeholder message for the bot response
+    const botDiv = document.createElement('div');
+    botDiv.classList.add('message', 'bot');
+    const botP = document.createElement('p');
+    botDiv.appendChild(botP);
+    chatMessages.appendChild(botDiv);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+
     try {
         const res = await fetch(`${API_BASE}/ask-llm`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ question: text })
         });
-        const data = await res.json();
-        addMessage(data.answer, 'bot');
+
+        if (!res.ok) {
+            botP.textContent = "Sorry, I couldn't reach the server.";
+            return;
+        }
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop(); // Keep incomplete line in buffer
+
+            for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                    const dataStr = line.substring(6);
+                    if (dataStr.trim()) {
+                        try {
+                            const data = JSON.parse(dataStr);
+                            if (data.answer) {
+                                botP.textContent += data.answer;
+                                chatMessages.scrollTop = chatMessages.scrollHeight;
+                            } else if (data.error) {
+                                botP.textContent = `Error: ${data.error}`;
+                            }
+                        } catch (e) {
+                            console.error('Failed to parse SSE data:', e);
+                        }
+                    }
+                }
+            }
+        }
     } catch (err) {
-        addMessage("Sorry, I couldn't reach the server.", 'bot');
+        console.error('Chat error:', err);
+        botP.textContent = "Sorry, I couldn't reach the server.";
     }
 }
 

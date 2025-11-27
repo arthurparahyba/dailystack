@@ -97,3 +97,61 @@ class StackSpotClient:
         except Exception as e:
             print(f"Failed to get daily challenge: {e}")
             return None
+
+    def chat_with_agent(self, conversation_id, user_prompt):
+        """Sends a message to the GenAI Code Buddy Agent and yields streaming responses."""
+        token = self.authenticate()
+        if not token:
+            print("Failed to authenticate.")
+            return
+
+        url = "https://genai-code-buddy-api.stackspot.com/v3/chat"
+
+        data = {
+            "context": {
+                "conversation_id": conversation_id,
+                "stackspot_ai_version": "2.3.0"
+            },
+            "user_prompt": f"{user_prompt}"
+        }
+
+        headers = {
+            'Content-Type': 'application/json',
+            'authorization': f'Bearer {token}'
+        }
+
+        try:
+            response = requests.post(url, json=data, headers=headers, stream=True)
+            print(f"Chat response status: {response.status_code}")
+
+            if response.status_code == 403 or response.status_code == 401:
+                print(f"Erro: Status code {response.status_code} - {response.text}")
+                yield {"error": f"Erro: Status code {response.status_code} - {response.text}"}
+                return
+
+            if response.status_code != 200:
+                print(f"Erro: Status code {response.status_code} - {response.text}")
+                yield {"error": f"Erro: Status code {response.status_code} - {response.text}"}
+                return
+
+            for line in response.iter_lines():
+                if line:
+                    decoded_line = line.decode('utf-8')
+                    print(f"Stream line: {decoded_line}") # Debug print
+                    
+                    if decoded_line.startswith('data: '):
+                        try:
+                            json_data = decoded_line[6:] # Slice after 'data: '
+                            if json_data.strip():
+                                data_dict = json.loads(json_data)
+                                if "answer" in data_dict:
+                                    yield data_dict
+                        except Exception as e:
+                            print(f"Failed to parse line: {decoded_line}, error: {e}")
+                    
+                    if 'event: end_event' in decoded_line:
+                        break
+
+        except Exception as e:
+            print(f"Failed to chat with agent: {e}")
+            yield {"error": str(e)}

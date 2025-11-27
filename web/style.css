@@ -30,14 +30,9 @@ body {
 
 .app-container {
     display: grid;
-    grid-template-rows: auto 1fr auto;
-    /* Scenario, Flashcard, Chat (if bottom) */
-    /* Let's try a layout where Chat is on the side or bottom. 
-       Given desktop app, maybe side-by-side for flashcard and chat? 
-       Or vertical scroll. Let's go with a vertical layout for simplicity but polished.
-    */
-    grid-template-columns: 1fr 350px;
     grid-template-rows: auto 1fr;
+    /* Flashcard width < AI Assistant width */
+    grid-template-columns: 1fr 1.5fr;
     gap: 20px;
     padding: 20px;
     height: 100vh;
@@ -167,8 +162,8 @@ body {
 }
 
 .details-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
+    display: flex;
+    flex-direction: column;
     gap: 20px;
 }
 
