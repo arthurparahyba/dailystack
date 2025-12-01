@@ -3,22 +3,14 @@ import requests
 import datetime
 import os
 import json
-import uuid
 
 api_bp = Blueprint('api', __name__)
 
 from backend.client import StackSpotClient
+from backend.models import AppState, Scenario, Flashcard, DailyChallenge
 
-# Global State
-app_state = {
-    "current_date": None,
-    "scenario": None,
-    "flashcards": [],
-    "current_flashcard_index": 0,
-    "current_conversation_id": None,
-    "is_first_message_for_card": True,
-    "conversations": {} # { flashcard_index: { "id": "...", "messages": [], "is_first": bool } }
-}
+# Global State - Typed AppState instance
+app_state = AppState()
 
 # Initialize Client
 client = StackSpotClient()
@@ -26,85 +18,81 @@ client = StackSpotClient()
 def load_daily_challenge():
     """Loads the daily challenge from the GenAI Agent."""
     print("Fetching daily challenge from GenAI Agent...", flush=True)
-    data = client.get_daily_challenge()
+    daily_challenge = client.get_daily_challenge()
     
-    if data:
-        app_state["current_date"] = data.get("date")
-        app_state["scenario"] = data.get("scenario")
-        app_state["flashcards"] = data.get("flashcards", [])
-        app_state["current_flashcard_index"] = 0
-        app_state["conversations"] = {} # Reset conversations on new challenge
+    if daily_challenge:
+        # Store the typed DailyChallenge object directly
+        print(f"DEBUG - Loaded challenge for date: {daily_challenge.date}", flush=True)
+        print(f"DEBUG - Scenario: {daily_challenge.scenario.title}", flush=True)
+        print(f"DEBUG - Flashcard count: {len(daily_challenge.flashcards)}", flush=True)
+        
+        app_state.daily_challenge = daily_challenge
+        app_state.current_flashcard_index = 0
+        app_state.conversations = {}  # Reset conversations on new challenge
         
         # Initialize conversation for first card
-        conv_id = uuid.uuid4().hex[:26]
-        app_state["current_conversation_id"] = conv_id
-        app_state["is_first_message_for_card"] = True
-        app_state["conversations"][0] = {
-            "id": conv_id,
-            "messages": [],
-            "is_first": True
-        }
+        app_state.initialize_conversation(0)
         
         print("Daily challenge loaded successfully.", flush=True)
     else:
-        print("Failed to load daily challenge. Using fallback/empty state.", flush=True)
+        print("Failed to load daily challenge. Using fallback/mock data.", flush=True)
+        # Create mock data using typed objects
+        mock_scenario = Scenario(
+            title="Debug Scenario",
+            description="This is a mock scenario for debugging purposes.",
+            context="You are debugging a Python application that is missing API credentials."
+        )
+        
+        mock_flashcards = [
+            Flashcard(
+                question="Why is the API returning null?",
+                answer="Because the credentials are missing.",
+                category="Debugging",
+                detailed_explanation="The application requires STK_CLIENT_ID, STK_CLIENT_KEY, and STK_REALM environment variables to fetch real data.",
+                code_example="os.environ.get('STK_CLIENT_ID')"
+            )
+        ]
+        
+        app_state.daily_challenge = DailyChallenge(
+            date=str(datetime.date.today()),
+            scenario=mock_scenario,
+            flashcards=mock_flashcards
+        )
+        app_state.current_flashcard_index = 0
+        app_state.conversations = {}
+        app_state.initialize_conversation(0)
+        
+        print("Mock data loaded successfully.", flush=True)
 
 
 @api_bp.route('/scenario', methods=['GET'])
 def get_scenario():
-    return jsonify(app_state["scenario"])
+    scenario = app_state.get_scenario()
+    if scenario:
+        print(f"DEBUG - Scenario data: {scenario.title}", flush=True)
+        return jsonify(scenario.to_dict())
+    return jsonify({})
 
 @api_bp.route('/flashcard/current', methods=['GET'])
 def get_current_flashcard():
-    if not app_state["flashcards"]:
-        return jsonify({})
-    
-    idx = app_state["current_flashcard_index"]
-    # Safety check
-    if idx >= len(app_state["flashcards"]):
-        app_state["current_flashcard_index"] = 0
-        idx = 0
-        
-    return jsonify(app_state["flashcards"][idx])
+    flashcard = app_state.get_current_flashcard()
+    if flashcard:
+        return jsonify(flashcard.to_dict())
+    return jsonify({})
 
 @api_bp.route('/flashcard/next', methods=['POST'])
 def next_flashcard():
-    if not app_state["flashcards"]:
-        return jsonify({"status": "no flashcards"})
-        
-    app_state["current_flashcard_index"] += 1
-    
-    # Loop back to 0 if we exceed the list
-    if app_state["current_flashcard_index"] >= len(app_state["flashcards"]):
-        app_state["current_flashcard_index"] = 0
-    
-    idx = app_state["current_flashcard_index"]
-    
-    # Check if we have a conversation for this card
-    if idx in app_state["conversations"]:
-        # Restore conversation
-        conv_data = app_state["conversations"][idx]
-        app_state["current_conversation_id"] = conv_data["id"]
-        app_state["is_first_message_for_card"] = conv_data["is_first"]
-    else:
-        # Create new conversation
-        conv_id = uuid.uuid4().hex[:26]
-        app_state["current_conversation_id"] = conv_id
-        app_state["is_first_message_for_card"] = True
-        app_state["conversations"][idx] = {
-            "id": conv_id,
-            "messages": [],
-            "is_first": True
-        }
-        
-    # Return the new current flashcard
-    return get_current_flashcard()
+    flashcard = app_state.next_flashcard()
+    if flashcard:
+        return jsonify(flashcard.to_dict())
+    return jsonify({"status": "no flashcards"})
 
 @api_bp.route('/chat/history', methods=['GET'])
 def get_chat_history():
-    idx = app_state["current_flashcard_index"]
-    if idx in app_state["conversations"]:
-        return jsonify(app_state["conversations"][idx]["messages"])
+    idx = app_state.current_flashcard_index
+    conversation = app_state.get_conversation(idx)
+    if conversation:
+        return jsonify(conversation.messages)
     return jsonify([])
 
 @api_bp.route('/ask-llm', methods=['POST'])
@@ -113,36 +101,29 @@ def ask_llm():
     question = data.get("question")
     print(f"pergunta do usuário: {question}")
     
-    idx = app_state["current_flashcard_index"]
+    idx = app_state.current_flashcard_index
     
     # Ensure conversation exists (should be handled by load/next, but safety check)
-    if idx not in app_state["conversations"]:
-         conv_id = uuid.uuid4().hex[:26]
-         app_state["conversations"][idx] = {
-            "id": conv_id,
-            "messages": [],
-            "is_first": True
-         }
-         app_state["current_conversation_id"] = conv_id
-         app_state["is_first_message_for_card"] = True
+    if idx not in app_state.conversations:
+         app_state.initialize_conversation(idx)
     
     # Save user message
-    app_state["conversations"][idx]["messages"].append({"role": "user", "content": question})
+    app_state.conversations[idx].messages.append({"role": "user", "content": question})
     
-    if not app_state["current_conversation_id"]:
-        app_state["current_conversation_id"] = app_state["conversations"][idx]["id"]
-    print(f"id da conversa: {app_state['current_conversation_id']}")
+    if not app_state.current_conversation_id:
+        app_state.current_conversation_id = app_state.conversations[idx].id
+    print(f"id da conversa: {app_state.current_conversation_id}")
     
     # Build user prompt
-    if app_state["is_first_message_for_card"] and app_state["flashcards"]:
-        if idx < len(app_state["flashcards"]):
-            flashcard = app_state["flashcards"][idx]
-            flashcard_question = flashcard.get("question", "")
-            flashcard_answer = flashcard.get("detailed_explanation", "")
+    if app_state.is_first_message_for_card:
+        flashcard = app_state.get_current_flashcard()
+        if flashcard:
+            flashcard_question = flashcard.question
+            flashcard_answer = flashcard.detailed_explanation or flashcard.answer
             
             user_prompt = f"dada a questão: {flashcard_question} e dada a resposta {flashcard_answer} Responda a mensagem do usuário: {question}"
-            app_state["is_first_message_for_card"] = False
-            app_state["conversations"][idx]["is_first"] = False
+            app_state.is_first_message_for_card = False
+            app_state.conversations[idx].is_first = False
         else:
             user_prompt = question
     else:
@@ -150,7 +131,7 @@ def ask_llm():
     
     def generate():
         full_answer = ""
-        for event_data in client.chat_with_agent(app_state["current_conversation_id"], user_prompt):
+        for event_data in client.chat_with_agent(app_state.current_conversation_id, user_prompt):
             if "answer" in event_data:
                 answer_chunk = event_data["answer"]
                 full_answer += answer_chunk
@@ -165,7 +146,7 @@ def ask_llm():
         
         # Save bot message after streaming is complete
         if full_answer:
-            app_state["conversations"][idx]["messages"].append({"role": "bot", "content": full_answer})
+            app_state.conversations[idx].messages.append({"role": "bot", "content": full_answer})
     
     return Response(stream_with_context(generate()), content_type='text/event-stream')
 
@@ -209,3 +190,31 @@ def save_credentials():
     load_daily_challenge()
     
     return jsonify({"status": "success"})
+
+@api_bp.route('/debug/state', methods=['GET'])
+def debug_state():
+    """Returns the current app state for debugging."""
+    scenario = app_state.get_scenario()
+    return jsonify({
+        "current_date": app_state.get_current_date(),
+        "scenario": scenario.to_dict() if scenario else None,
+        "flashcards_count": app_state.get_flashcard_count(),
+        "current_flashcard_index": app_state.current_flashcard_index,
+        "has_credentials": all([
+            os.environ.get("STK_CLIENT_ID"),
+            os.environ.get("STK_CLIENT_KEY"),
+            os.environ.get("STK_REALM")
+        ])
+    })
+
+@api_bp.route('/debug/reload', methods=['POST'])
+def debug_reload():
+    """Manually triggers a reload of the daily challenge."""
+    load_daily_challenge()
+    return jsonify({"status": "reload triggered"})
+
+
+def init_app_state():
+    """Initialize the application state on startup."""
+    print("Initializing application state...", flush=True)
+    load_daily_challenge()

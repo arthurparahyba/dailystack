@@ -2,6 +2,7 @@ import os
 import requests
 import json
 import time
+from backend.models import DailyChallenge
 
 class StackSpotClient:
     def __init__(self):
@@ -37,7 +38,6 @@ class StackSpotClient:
             response = requests.post(url, headers=headers, data=data)
             response.raise_for_status()
             json_response = response.json()
-            print(f"Authentication successful: {json_response}")
             self.token = json_response['access_token']
             # Default to 1 hour expiration if not provided, usually expires_in is returned
             expires_in = json_response.get('expires_in', 3600)
@@ -47,8 +47,14 @@ class StackSpotClient:
             print(f"Authentication failed: {e}")
             return None
 
-    def get_daily_challenge(self):
-        """Fetches the daily challenge from the GenAI Agent."""
+    def get_daily_challenge(self) -> DailyChallenge | None:
+        """
+        Fetches the daily challenge from the GenAI Agent.
+        
+        Returns:
+            DailyChallenge: Object containing date, scenario, and flashcards
+            None: If authentication or request fails
+        """
         token = self.authenticate()
         if not token:
             print("Failed to authenticate.")
@@ -74,29 +80,44 @@ class StackSpotClient:
             response.raise_for_status()
             data = response.json()
             
-            # Handle different response formats
-            if 'message' in data and isinstance(data['message'], str):
-                try:
-                    return json.loads(data['message'])
-                except json.JSONDecodeError:
-                    return data
-
-            if isinstance(data, str):
-                 return json.loads(data)
+            print(f"DEBUG - Raw API response: {data}", flush=True)
             
-            if 'choices' in data and len(data['choices']) > 0:
-                content = data['choices'][0]['message']['content']
-                if content.startswith("```json"):
-                    content = content.replace("```json", "").replace("```", "")
-                elif content.startswith("```"):
-                    content = content.replace("```", "")
-                return json.loads(content)
-                
-            return data
+            # Parse the response to get the actual data
+            parsed_data = self._parse_agent_response(data)
+            
+            print(f"DEBUG - Parsed data: {parsed_data}", flush=True)
+            
+            if parsed_data:
+                # Convert to DailyChallenge object
+                return DailyChallenge.from_dict(parsed_data)
+            
+            return None
 
         except Exception as e:
             print(f"Failed to get daily challenge: {e}")
             return None
+    
+    def _parse_agent_response(self, data: dict) -> dict | None:
+        """
+        Parses the agent response to extract the actual data.
+        Handles different response formats from the GenAI Agent.
+        
+        Args:
+            data: Raw response from the agent
+            
+        Returns:
+            dict: Parsed data or None if parsing fails
+        """
+            # Handle different response formats
+        if 'message' not in data and isinstance(data['message'], str):
+            print(f"Failed to parse agent response There is no message attribute: {data}")
+            return None
+        try:
+            return json.loads(data['message'])
+        except json.JSONDecodeError:
+            print(f"Failed to parse agent response: {e}")
+            return None
+
 
     def chat_with_agent(self, conversation_id, user_prompt):
         """Sends a message to the GenAI Code Buddy Agent and yields streaming responses."""

@@ -4,11 +4,15 @@ import time
 import sys
 from flask import Flask
 import webview
-from backend.api import api_bp, load_daily_challenge, app_state
+from backend.api import api_bp, init_app_state, app_state
 
 # Initialize Flask
-server = Flask(__name__, static_folder='web', static_url_path='')
-server.register_blueprint(api_bp)
+server = Flask(__name__, static_folder='frontend_dist', static_url_path='')
+server.register_blueprint(api_bp, url_prefix='/api')
+
+@server.route('/')
+def index():
+    return server.send_static_file('index.html')
 
 def verify_date_loop():
     """Background thread to check for date changes."""
@@ -18,9 +22,9 @@ def verify_date_loop():
         # For this prototype, we'll just print a heartbeat.
         print("Checking date...", file=sys.stderr)
         # Logic to reload if date changed:
-        # current_day = ...
-        # if current_day != app_state["current_date"]:
-        #     load_daily_challenge()
+        # current_day = str(datetime.date.today())
+        # if current_day != app_state.get_current_date():
+        #     init_app_state()
 
 def start_server():
     """Starts the Flask server."""
@@ -33,7 +37,7 @@ def start_server():
 if __name__ == '__main__':
     # Load initial data in background
     print("Starting background data load...", file=sys.stderr)
-    t_load = threading.Thread(target=load_daily_challenge, daemon=True)
+    t_load = threading.Thread(target=init_app_state, daemon=True)
     t_load.start()
 
     # Start date verification thread
@@ -45,5 +49,5 @@ if __name__ == '__main__':
     t_server.start()
 
     # Create WebView window
-    webview.create_window('DevFlashcards', 'http://127.0.0.1:5000/index.html', width=1200, height=800, resizable=True)
+    webview.create_window('DevFlashcards', 'http://127.0.0.1:5000', width=1200, height=800, resizable=True)
     webview.start(debug=False)
