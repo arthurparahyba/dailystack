@@ -59,7 +59,7 @@ class StackSpotClient:
             print("Failed to authenticate.")
             return None
 
-        url = 'https://genai-inference-app.stackspot.com/v1/agent/01JZV0C3DT4TM3BYYGAM8RS981/chat'
+        url = 'https://genai-inference-app.stackspot.com/v1/agent/01KB3P9EHER7FCHMPHM0MMYM5D/chat'
         headers = {
             'Content-Type': 'application/json',
             'Authorization': f'Bearer {token}'
