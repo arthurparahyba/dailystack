@@ -13,9 +13,9 @@ env.bak/
 venv.bak/
 
 # Distribution / Packaging
-dist/
+# Note: dist/ is tracked to version the executable
+# build/ contains PyInstaller temporary files
 build/
-*.spec
 
 # IDEs
 .vscode/

@@ -35,6 +35,9 @@ def start_server():
     server.run(host='127.0.0.1', port=5000, threaded=True)
 
 if __name__ == '__main__':
+    # Detect if running as PyInstaller bundle
+    is_packaged = getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS')
+    
     # Load initial data in background
     print("Starting background data load...", file=sys.stderr)
     t_load = threading.Thread(target=init_app_state, daemon=True)
@@ -50,4 +53,5 @@ if __name__ == '__main__':
 
     # Create WebView window
     webview.create_window('DevFlashcards', 'http://127.0.0.1:5000', width=1200, height=800, resizable=True)
-    webview.start(debug=True)
+    # Disable debug mode when running as packaged executable
+    webview.start(debug=not is_packaged)
