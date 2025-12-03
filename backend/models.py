@@ -46,7 +46,6 @@ class Scenario:
     """Represents the daily scenario/context."""
     title: str
     description: str
-    context: Optional[str] = None
     
     @classmethod
     def from_dict(cls, data: dict) -> 'Scenario':
@@ -54,18 +53,16 @@ class Scenario:
         print(f"DEBUG - Scenario.from_dict input: {data}", flush=True)
         scenario = cls(
             title=data.get('title', ''),
-            description=data.get('problem_description', ''),
-            context=data.get('architectural_overview')
+            description=data.get('problem_description', '')
         )
-        print(f"DEBUG - Created Scenario object: title='{scenario.title}', description='{scenario.description}', context='{scenario.context}'", flush=True)
+        print(f"DEBUG - Created Scenario object: title='{scenario.title}', description='{scenario.description}'", flush=True)
         return scenario
     
     def to_dict(self) -> dict:
         """Convert Scenario to dictionary."""
         return {
             'title': self.title,
-            'description': self.description,
-            'context': self.context
+            'description': self.description
         }
 
 
@@ -112,6 +109,8 @@ class AppState:
     current_flashcard_index: int = 0
     current_conversation_id: Optional[str] = None
     is_first_message_for_card: bool = True
+    is_loading: bool = True
+    error: Optional[str] = None
     conversations: Dict[int, ConversationState] = field(default_factory=dict)
     
     def get_scenario(self) -> Optional[Scenario]:
@@ -156,15 +155,57 @@ class AppState:
     
     def initialize_conversation(self, index: int) -> str:
         """Initialize a new conversation for a flashcard index."""
-        conv_id = uuid.uuid4().hex[:26]
+        conv_id = self.generate_ulid()
         self.current_conversation_id = conv_id
         self.is_first_message_for_card = True
+        
+        initial_messages = []
+        
+        # Seed with detailed explanation if available
+        # REMOVED: User requested to remove static detailed explanation in favor of dynamic LLM explanation
+        # if self.daily_challenge and index < len(self.daily_challenge.flashcards):
+        #     flashcard = self.daily_challenge.flashcards[index]
+        #     content_parts = []
+        #     
+        #     if flashcard.detailed_explanation:
+        #         content_parts.append(f"**Detailed Explanation:**\n{flashcard.detailed_explanation}")
+        #     
+        #     if flashcard.code_example:
+        #         content_parts.append(f"**Code Example:**\n```\n{flashcard.code_example}\n```")
+        #         
+        #     if content_parts:
+        #         initial_messages.append({
+        #             "role": "bot",
+        #             "content": "\n\n".join(content_parts)
+        #         })
+
         self.conversations[index] = ConversationState(
             id=conv_id,
-            messages=[],
+            messages=initial_messages,
             is_first=True
         )
         return conv_id
+
+    def generate_ulid(self) -> str:
+        """Generates a ULID-like string (26 chars) using Crockford's Base32."""
+        import time
+        import random
+        
+        CROCKFORD_BASE32 = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
+        t = int(time.time() * 1000)
+        
+        # Timestamp (10 chars)
+        timestamp_str = ""
+        for _ in range(10):
+            timestamp_str = CROCKFORD_BASE32[t % 32] + timestamp_str
+            t //= 32
+            
+        # Randomness (16 chars)
+        random_str = ""
+        for _ in range(16):
+            random_str += random.choice(CROCKFORD_BASE32)
+            
+        return timestamp_str + random_str
     
     def get_conversation(self, index: int) -> Optional[ConversationState]:
         """Get the conversation state for a specific flashcard index."""

@@ -7,7 +7,7 @@ import webview
 from backend.api import api_bp, init_app_state, app_state
 
 # Initialize Flask
-server = Flask(__name__, static_folder='frontend_dist', static_url_path='')
+server = Flask(__name__, static_folder='frontend/build', static_url_path='')
 server.register_blueprint(api_bp, url_prefix='/api')
 
 @server.route('/')
@@ -20,7 +20,7 @@ def verify_date_loop():
         time.sleep(300)  # Check every 5 minutes
         # In a real app, we would check if the date has changed.
         # For this prototype, we'll just print a heartbeat.
-        print("Checking date...", file=sys.stderr)
+        #print("Checking date...", file=sys.stderr)
         # Logic to reload if date changed:
         # current_day = str(datetime.date.today())
         # if current_day != app_state.get_current_date():
@@ -50,4 +50,4 @@ if __name__ == '__main__':
 
     # Create WebView window
     webview.create_window('DevFlashcards', 'http://127.0.0.1:5000', width=1200, height=800, resizable=True)
-    webview.start(debug=False)
+    webview.start(debug=True)

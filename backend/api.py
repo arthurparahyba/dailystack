@@ -10,20 +10,23 @@ from backend.client import StackSpotClient
 from backend.models import AppState, Scenario, Flashcard, DailyChallenge
 
 # Global State - Typed AppState instance
-app_state = AppState()
+app_state: AppState = AppState()
 
 # Initialize Client
 client = StackSpotClient()
 
 def load_daily_challenge():
     """Loads the daily challenge from the GenAI Agent."""
+    app_state.is_loading = True
+    app_state.error = None
     print("Fetching daily challenge from GenAI Agent...", flush=True)
     daily_challenge = client.get_daily_challenge()
     
     if daily_challenge:
         # Store the typed DailyChallenge object directly
         print(f"DEBUG - Loaded challenge for date: {daily_challenge.date}", flush=True)
-        print(f"DEBUG - Scenario: {daily_challenge.scenario.title}", flush=True)
+        # Use repr() to avoid UnicodeEncodeError
+        print(f"DEBUG - Scenario: {repr(daily_challenge.scenario.title)}", flush=True)
         print(f"DEBUG - Flashcard count: {len(daily_challenge.flashcards)}", flush=True)
         
         app_state.daily_challenge = daily_challenge
@@ -33,43 +36,38 @@ def load_daily_challenge():
         # Initialize conversation for first card
         app_state.initialize_conversation(0)
         
+        app_state.is_loading = False
         print("Daily challenge loaded successfully.", flush=True)
     else:
-        print("Failed to load daily challenge. Using fallback/mock data.", flush=True)
-        # Create mock data using typed objects
-        mock_scenario = Scenario(
-            title="Debug Scenario",
-            description="This is a mock scenario for debugging purposes.",
-            context="You are debugging a Python application that is missing API credentials."
-        )
-        
-        mock_flashcards = [
-            Flashcard(
-                question="Why is the API returning null?",
-                answer="Because the credentials are missing.",
-                category="Debugging",
-                detailed_explanation="The application requires STK_CLIENT_ID, STK_CLIENT_KEY, and STK_REALM environment variables to fetch real data.",
-                code_example="os.environ.get('STK_CLIENT_ID')"
-            )
-        ]
-        
-        app_state.daily_challenge = DailyChallenge(
-            date=str(datetime.date.today()),
-            scenario=mock_scenario,
-            flashcards=mock_flashcards
-        )
-        app_state.current_flashcard_index = 0
-        app_state.conversations = {}
-        app_state.initialize_conversation(0)
-        
-        print("Mock data loaded successfully.", flush=True)
+        print("Failed to load daily challenge.", flush=True)
+        app_state.error = client.last_error or "Failed to load daily challenge"
+        app_state.is_loading = False
+
+
+@api_bp.after_request
+def add_header(response):
+    """Add headers to both force latest IE rendering engine or Chrome Frame,
+    and also to cache the rendered page for 10 minutes."""
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, post-check=0, pre-check=0, max-age=0'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '-1'
+    return response
+
+@api_bp.route('/status', methods=['GET'])
+def get_status():
+    """Returns the current loading status and data availability."""
+    return jsonify({
+        "loading": app_state.is_loading,
+        "has_data": app_state.daily_challenge is not None,
+        "error": app_state.error
+    })
 
 
 @api_bp.route('/scenario', methods=['GET'])
 def get_scenario():
     scenario = app_state.get_scenario()
     if scenario:
-        print(f"DEBUG - Scenario data: {scenario.title}", flush=True)
+        print(f"DEBUG - Scenario data: {scenario.title}")
         return jsonify(scenario.to_dict())
     return jsonify({})
 
@@ -99,7 +97,8 @@ def get_chat_history():
 def ask_llm():
     data = request.json
     question = data.get("question")
-    print(f"pergunta do usuário: {question}")
+    is_hidden = data.get("hidden", False)
+    print(f"pergunta do usuário: {question} (hidden={is_hidden})")
     
     idx = app_state.current_flashcard_index
     
@@ -107,8 +106,9 @@ def ask_llm():
     if idx not in app_state.conversations:
          app_state.initialize_conversation(idx)
     
-    # Save user message
-    app_state.conversations[idx].messages.append({"role": "user", "content": question})
+    # Save user message ONLY if not hidden
+    if not is_hidden:
+        app_state.conversations[idx].messages.append({"role": "user", "content": question})
     
     if not app_state.current_conversation_id:
         app_state.current_conversation_id = app_state.conversations[idx].id
@@ -212,6 +212,34 @@ def debug_reload():
     """Manually triggers a reload of the daily challenge."""
     load_daily_challenge()
     return jsonify({"status": "reload triggered"})
+
+@api_bp.route('/debug/fetch', methods=['GET'])
+def debug_fetch():
+    """Debug endpoint to try fetching data and return result/error."""
+    try:
+        # Check Auth first
+        token = client.authenticate()
+        if not token:
+             return jsonify({
+                 "status": "failed", 
+                 "reason": "Authentication failed",
+                 "client_id": client.client_id,
+                 "has_key": bool(client.client_key),
+                 "realm": client.realm
+             })
+
+        # Try fetch
+        challenge = client.get_daily_challenge()
+        if challenge:
+            return jsonify({"status": "success", "title": challenge.scenario.title})
+        else:
+            return jsonify({
+                "status": "failed", 
+                "reason": "client.get_daily_challenge returned None (Auth successful)",
+                "last_error": client.last_error
+            })
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)})
 
 
 def init_app_state():

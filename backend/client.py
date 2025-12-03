@@ -9,29 +9,27 @@ class StackSpotClient:
         self.reload_credentials()
         self.token = None
         self.token_expires_at = 0
+        self.last_error = None
 
     def reload_credentials(self):
-        """Reloads credentials from environment variables."""
         self.client_id = os.environ.get("STK_CLIENT_ID")
         self.client_key = os.environ.get("STK_CLIENT_KEY")
         self.realm = os.environ.get("STK_REALM")
 
     def authenticate(self):
-        """Authenticates with the IDM service to get a JWT."""
-        if not all([self.client_id, self.client_key, self.realm]):
-            print("Missing credentials. Please set STK_CLIENT_ID, STK_CLIENT_KEY, and STK_REALM.")
-            return None
-
-        # Check if token is still valid (with 60s buffer)
-        if self.token and time.time() < self.token_expires_at - 60:
+        if self.token and self.token_expires_at > time.time():
             return self.token
+
+        if not all([self.client_id, self.client_key, self.realm]):
+            self.last_error = "Missing credentials"
+            return None
 
         url = f"https://idm.stackspot.com/{self.realm}/oidc/oauth/token"
         headers = {'Content-Type': 'application/x-www-form-urlencoded'}
         data = {
-            'grant_type': 'client_credentials',
             'client_id': self.client_id,
-            'client_secret': self.client_key
+            'client_secret': self.client_key,
+            'grant_type': 'client_credentials'
         }
 
         try:
@@ -39,11 +37,10 @@ class StackSpotClient:
             response.raise_for_status()
             json_response = response.json()
             self.token = json_response['access_token']
-            # Default to 1 hour expiration if not provided, usually expires_in is returned
-            expires_in = json_response.get('expires_in', 3600)
-            self.token_expires_at = time.time() + expires_in
+            self.token_expires_at = time.time() + json_response['expires_in'] - 60 # Buffer
             return self.token
         except Exception as e:
+            self.last_error = f"Authentication failed: {e}"
             print(f"Authentication failed: {e}")
             return None
 
@@ -55,8 +52,10 @@ class StackSpotClient:
             DailyChallenge: Object containing date, scenario, and flashcards
             None: If authentication or request fails
         """
+        self.last_error = None # Reset error
         token = self.authenticate()
         if not token:
+            self.last_error = "Failed to authenticate."
             print("Failed to authenticate.")
             return None
 
@@ -80,21 +79,24 @@ class StackSpotClient:
             response.raise_for_status()
             data = response.json()
             
-            print(f"DEBUG - Raw API response: {data}", flush=True)
+            # Use ascii() to avoid UnicodeEncodeError on Windows consoles
+            print(f"DEBUG - Raw API response: {ascii(data)}", flush=True)
             
             # Parse the response to get the actual data
             parsed_data = self._parse_agent_response(data)
             
-            print(f"DEBUG - Parsed data: {parsed_data}", flush=True)
+            print(f"DEBUG - Parsed data: {ascii(parsed_data)}", flush=True)
             
             if parsed_data:
                 # Convert to DailyChallenge object
                 return DailyChallenge.from_dict(parsed_data)
             
+            self.last_error = "Parsed data is None"
             return None
 
         except Exception as e:
-            print(f"Failed to get daily challenge: {e}")
+            self.last_error = f"Failed to get daily challenge: {e}"
+            print(f"Failed to get daily challenge: {ascii(e)}")
             return None
     
     def _parse_agent_response(self, data: dict) -> dict | None:
@@ -158,7 +160,6 @@ class StackSpotClient:
             for line in response.iter_lines():
                 if line:
                     decoded_line = line.decode('utf-8')
-                    print(f"Stream line: {decoded_line}") # Debug print
                     
                     if decoded_line.startswith('data: '):
                         try:

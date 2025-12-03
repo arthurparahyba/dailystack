@@ -3,10 +3,9 @@
  */
 
 export class Scenario {
-    constructor({ title, description, context }) {
+    constructor({ title, description }) {
         this.title = title || '';
         this.description = description || '';
-        this.context = context || '';
     }
 
     static fromDict(data) {

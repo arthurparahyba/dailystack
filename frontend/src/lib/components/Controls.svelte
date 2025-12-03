@@ -6,44 +6,18 @@
     const dispatch = createEventDispatcher();
 </script>
 
-<div class="controls">
-    <button on:click={() => dispatch("toggle")}>
+<div class="flex justify-center gap-2 mt-2">
+    <button
+        on:click={() => dispatch("toggle")}
+        class="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-full font-medium transition-colors"
+    >
         {showAnswer ? "Hide Answer" : "Show Answer"}
     </button>
 
-    <button class="secondary" on:click={() => dispatch("next")}>
+    <button
+        class="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-full font-medium transition-colors"
+        on:click={() => dispatch("next")}
+    >
         Next Card
     </button>
 </div>
-
-<style>
-    .controls {
-        display: flex;
-        justify-content: center;
-        gap: 1rem;
-        margin-top: 1rem;
-    }
-
-    button {
-        padding: 0.8rem 1.5rem;
-        font-size: 1rem;
-        background-color: #ff3e00;
-        color: white;
-        border: none;
-        border-radius: 4px;
-        cursor: pointer;
-        transition: background-color 0.2s;
-    }
-
-    button:hover {
-        background-color: #e63800;
-    }
-
-    button.secondary {
-        background-color: #666;
-    }
-
-    button.secondary:hover {
-        background-color: #555;
-    }
-</style>

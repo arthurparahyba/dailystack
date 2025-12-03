@@ -17,111 +17,47 @@
     }
 </script>
 
-<div class="card-container">
+<div class="h-full mb-0" style="perspective: 1000px;">
     <div
-        class="card"
-        class:flipped={showAnswer}
+        class="relative w-full h-full cursor-pointer rounded-xl shadow-lg transition-transform duration-[600ms]"
+        class:rotate-y-180={showAnswer}
         on:click={handleClick}
         on:keydown={handleKeydown}
         role="button"
         tabindex="0"
+        style="transform-style: preserve-3d;"
     >
-        <div class="card-front">
-            <span class="category">{flashcard.category || "General"}</span>
-            <h2>{flashcard.question}</h2>
-            <p class="hint">Click to reveal answer</p>
+        <!-- Front of card -->
+        <div
+            class="absolute inset-0 p-8 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl flex flex-col items-center justify-center text-center border-2 border-orange-400"
+            style="-webkit-backface-visibility: hidden; backface-visibility: hidden;"
+        >
+            <span
+                class="absolute top-4 right-4 bg-orange-700 bg-opacity-50 px-2 py-1 rounded text-xs text-white font-medium"
+            >
+                {flashcard.category || "General"}
+            </span>
+            <h2 class="text-xl font-semibold text-white">
+                {flashcard.question}
+            </h2>
+            <p class="mt-8 text-sm text-orange-100 italic">
+                Click to reveal answer
+            </p>
         </div>
-        <div class="card-back">
-            <h3>Answer</h3>
-            <p>{flashcard.answer}</p>
-            {#if flashcard.detailedExplanation}
-                <div class="explanation">
-                    <h4>Detailed Explanation</h4>
-                    <p>{flashcard.detailedExplanation}</p>
-                </div>
-            {/if}
-            {#if flashcard.codeExample}
-                <pre><code>{flashcard.codeExample}</code></pre>
-            {/if}
+
+        <!-- Back of card -->
+        <div
+            class="absolute inset-0 p-8 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl flex flex-col justify-start items-start text-left overflow-y-auto border-2 border-orange-400"
+            style="-webkit-backface-visibility: hidden; backface-visibility: hidden; transform: rotateY(180deg);"
+        >
+            <h3 class="text-lg font-semibold text-white mb-2">Answer</h3>
+            <p class="text-orange-50">{flashcard.answer}</p>
         </div>
     </div>
 </div>
 
 <style>
-    .card-container {
-        perspective: 1000px;
-        margin-bottom: 2rem;
-    }
-
-    .card {
-        position: relative;
-        width: 100%;
-        min-height: 300px;
-        transform-style: preserve-3d;
-        transition: transform 0.6s;
-        cursor: pointer;
-        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-        border-radius: 12px;
-    }
-
-    .card.flipped {
+    .rotate-y-180 {
         transform: rotateY(180deg);
-    }
-
-    .card-front,
-    .card-back {
-        position: absolute;
-        width: 100%;
-        height: 100%;
-        -webkit-backface-visibility: hidden;
-        backface-visibility: hidden;
-        padding: 2rem;
-        box-sizing: border-box;
-        background: white;
-        border-radius: 12px;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-        text-align: center;
-    }
-
-    .card-back {
-        transform: rotateY(180deg);
-        overflow-y: auto;
-        justify-content: flex-start;
-        align-items: flex-start;
-        text-align: left;
-    }
-
-    .category {
-        position: absolute;
-        top: 1rem;
-        right: 1rem;
-        background: #eee;
-        padding: 0.25rem 0.5rem;
-        border-radius: 4px;
-        font-size: 0.8em;
-        color: #666;
-    }
-
-    .hint {
-        margin-top: 2rem;
-        font-size: 0.9em;
-        color: #999;
-        font-style: italic;
-    }
-
-    pre {
-        background: #f4f4f4;
-        padding: 1rem;
-        border-radius: 4px;
-        width: 100%;
-        overflow-x: auto;
-        margin-top: 1rem;
-    }
-
-    code {
-        font-family: monospace;
     }
 </style>
