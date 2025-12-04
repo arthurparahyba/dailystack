@@ -55,14 +55,21 @@ export async function fetchChatHistory() {
  * Send a message to the LLM
  * @param {string} question - The user's question
  * @param {boolean} hidden - Whether the question should be hidden from chat history
+ * @param {AbortSignal} signal - Optional AbortSignal to cancel the request
  * @returns {Promise<Response>} Fetch response object (for streaming)
  */
-export async function askLlm(question, hidden = false) {
-    return await fetch(`${API_BASE}/ask-llm`, {
+export async function askLlm(question, hidden = false, signal = null) {
+    const options = {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
         },
         body: JSON.stringify({ question, hidden })
-    });
+    };
+
+    if (signal) {
+        options.signal = signal;
+    }
+
+    return await fetch(`${API_BASE}/ask-llm`, options);
 }

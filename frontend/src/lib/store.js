@@ -72,13 +72,27 @@ export async function loadDailyChallenge() {
 // Track if we've already requested an explanation for the current card
 let explanationRequested = false;
 
+// AbortController to cancel ongoing requests
+let currentAbortController = null;
+
+// Declare stores first (before subscribe)
+export const messages = writable([]);
+export const isGenerating = writable(false);
+
 // Reset explanation flag when card changes
 flashcard.subscribe(() => {
     explanationRequested = false;
-});
 
-export const messages = writable([]);
-export const isGenerating = writable(false);
+    // Cancel any ongoing streaming request
+    if (currentAbortController) {
+        currentAbortController.abort();
+        currentAbortController = null;
+    }
+
+    // Clear messages for new card
+    messages.set([]);
+    isGenerating.set(false);
+});
 
 export function toggleAnswer() {
     showAnswer.update(n => {
@@ -94,6 +108,10 @@ async function triggerExplanation() {
     explanationRequested = true;
     isGenerating.set(true);
 
+    // Create new AbortController for this request
+    currentAbortController = new AbortController();
+    const signal = currentAbortController.signal;
+
     // Get current state
     let currentScenario;
     let currentFlashcard;
@@ -106,6 +124,7 @@ async function triggerExplanation() {
 
     if (!currentScenario || !currentFlashcard) {
         isGenerating.set(false);
+        currentAbortController = null;
         return;
     }
 
@@ -118,7 +137,7 @@ Pergunta: ${currentFlashcard.question}
 Resposta: ${currentFlashcard.answer}`;
 
     try {
-        const res = await api.askLlm(prompt, true); // hidden=true
+        const res = await api.askLlm(prompt, true, signal); // Pass signal
         if (!res.ok) throw new Error("Failed to fetch explanation");
 
         const reader = res.body.getReader();
@@ -155,10 +174,16 @@ Resposta: ${currentFlashcard.answer}`;
             }
         }
     } catch (e) {
-        console.error("Error fetching explanation:", e);
-        messages.update(msgs => [...msgs, { role: 'bot', content: "Sorry, I couldn't generate an explanation at this time." }]);
+        // Don't show error if request was aborted (user changed cards)
+        if (e.name === 'AbortError') {
+            console.log("Explanation request cancelled");
+        } else {
+            console.error("Error fetching explanation:", e);
+            messages.update(msgs => [...msgs, { role: 'bot', content: "Sorry, I couldn't generate an explanation at this time." }]);
+        }
     } finally {
         isGenerating.set(false);
+        currentAbortController = null;
     }
 }
 
