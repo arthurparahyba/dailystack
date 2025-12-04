@@ -43,23 +43,23 @@ class StackSpotChallengeClient:
             "conversation_id": "01KB1ATKQDKNWZXSV3JNCP72KB" 
         }
         
-        try:
-            # Timeout of 60 seconds to accommodate LLM generation time
-            response = requests.post(url, headers=headers, json=payload, timeout=60)
-            response.raise_for_status()
-            data = response.json()
+        # Timeout of 60 seconds to accommodate LLM generation time
+        response = requests.post(url, headers=headers, json=payload, timeout=60)
+        
+        if response.status_code != 200:
+            error_msg = f"API Error {response.status_code}: {response.text}"
+            print(error_msg, file=sys.stderr)
+            raise Exception(error_msg)
             
-            # Parse the response to get the actual data
-            parsed_data = self._parse_agent_response(data)
-            
-            if parsed_data:
-                return DailyChallenge.from_dict(parsed_data)
-            
-            return None
-            
-        except Exception as e:
-            print(f"Failed to get daily challenge: {e}", file=sys.stderr)
-            return None
+        data = response.json()
+        
+        # Parse the response to get the actual data
+        parsed_data = self._parse_agent_response(data)
+        
+        if parsed_data:
+            return DailyChallenge.from_dict(parsed_data)
+        
+        raise Exception("Failed to parse agent response")
 
     def _parse_agent_response(self, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """
