@@ -4,11 +4,20 @@ import time
 import sys
 from flask import Flask
 import webview
-from backend.api import api_bp, init_app_state, app_state
+from backend.bootstrap import init_app_state
+from backend.presentation.routes.status_routes import status_bp
+from backend.presentation.routes.flashcard_routes import flashcard_bp
+from backend.presentation.routes.chat_routes import chat_bp
+from backend.presentation.routes.debug_routes import debug_bp
+from backend.presentation.routes.credentials_routes import credentials_bp
 
 # Initialize Flask
 server = Flask(__name__, static_folder='frontend/build', static_url_path='')
-server.register_blueprint(api_bp, url_prefix='/api')
+server.register_blueprint(status_bp, url_prefix='/api')
+server.register_blueprint(flashcard_bp, url_prefix='/api')
+server.register_blueprint(chat_bp, url_prefix='/api')
+server.register_blueprint(debug_bp, url_prefix='/api')
+server.register_blueprint(credentials_bp, url_prefix='/api')
 
 @server.route('/')
 def index():

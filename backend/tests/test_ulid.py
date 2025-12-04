@@ -4,7 +4,7 @@ import os
 # Add current directory to path
 sys.path.append(os.getcwd())
 
-from backend.models import AppState
+from backend.domain.entities import AppState
 
 def test_ulid_generation():
     app_state = AppState()

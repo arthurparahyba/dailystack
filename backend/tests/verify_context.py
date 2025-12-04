@@ -6,7 +6,7 @@ from dataclasses import asdict
 sys.path.append(os.getcwd())
 
 try:
-    from backend.models import Scenario
+    from backend.domain.entities import Scenario
     print("Successfully imported Scenario")
     
     # Test instantiation
