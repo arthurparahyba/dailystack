@@ -2,6 +2,8 @@
     import { onMount, beforeUpdate, afterUpdate } from "svelte";
     import { fetchChatHistory } from "../api";
     import { messages, isGenerating } from "../store";
+    import { marked } from "marked";
+    import DOMPurify from "dompurify";
 
     export let showAnswer = false;
 
@@ -39,18 +41,15 @@
 
     function formatContent(content) {
         if (!content) return "";
-
-        // Basic markdown code block parser
-        // Replaces ```lang ... ``` with styled HTML
-        return content
-            .replace(/```(\w+)?\n([\s\S]*?)```/g, (match, lang, code) => {
-                const language = lang || "text";
-                return `<div class="my-2 bg-gray-800 rounded-md overflow-hidden font-mono max-w-full">
-                <div class="bg-gray-700 text-gray-300 text-xs px-2 py-1 uppercase border-b border-gray-600">${language}</div>
-                <pre class="m-0 p-4 overflow-x-auto text-gray-100 max-w-full"><code class="font-mono">${code}</code></pre>
-            </div>`;
-            })
-            .replace(/\n/g, "<br>");
+        try {
+            // Parse markdown to HTML
+            const rawHtml = marked.parse(content, { async: false }) as string;
+            // Sanitize HTML
+            return DOMPurify.sanitize(rawHtml);
+        } catch (e) {
+            console.error("Error parsing markdown", e);
+            return content;
+        }
     }
 
     async function sendMessage() {
@@ -143,7 +142,7 @@
                     : 'items-start'}"
             >
                 <div
-                    class="px-4 py-3 rounded-xl leading-relaxed relative overflow-hidden max-w-[85%] min-w-0 break-words whitespace-pre-wrap {msg.role ===
+                    class="px-4 py-3 rounded-xl leading-relaxed relative overflow-hidden max-w-[85%] min-w-0 break-words whitespace-pre-wrap select-text markdown-content {msg.role ===
                     'user'
                         ? 'bg-orange-500 text-white rounded-br-sm'
                         : msg.role === 'bot'
@@ -197,3 +196,80 @@
         </button>
     </div>
 </div>
+
+<style>
+    /* Styles for markdown content within the chat */
+    :global(.markdown-content h1) {
+        font-size: 1.5em;
+        font-weight: bold;
+        margin-top: 0.5em;
+        margin-bottom: 0.5em;
+    }
+    :global(.markdown-content h2) {
+        font-size: 1.3em;
+        font-weight: bold;
+        margin-top: 0.5em;
+        margin-bottom: 0.5em;
+    }
+    :global(.markdown-content h3) {
+        font-size: 1.1em;
+        font-weight: bold;
+        margin-top: 0.5em;
+        margin-bottom: 0.5em;
+    }
+    :global(.markdown-content p) {
+        margin-bottom: 0.5em;
+    }
+    :global(.markdown-content ul) {
+        list-style-type: disc;
+        padding-left: 1.5em;
+        margin-bottom: 0.5em;
+    }
+    :global(.markdown-content ol) {
+        list-style-type: decimal;
+        padding-left: 1.5em;
+        margin-bottom: 0.5em;
+    }
+    :global(.markdown-content li) {
+        margin-bottom: 0.25em;
+    }
+    :global(.markdown-content strong) {
+        font-weight: bold;
+        color: #fb923c; /* orange-400 */
+    }
+    :global(.markdown-content code) {
+        background-color: #374151; /* gray-700 */
+        padding: 0.1em 0.3em;
+        border-radius: 0.25em;
+        font-family: monospace;
+        font-size: 0.9em;
+    }
+    :global(.markdown-content pre) {
+        background-color: #1f2937; /* gray-800 */
+        padding: 1em;
+        border-radius: 0.5em;
+        overflow-x: auto;
+        margin-bottom: 0.5em;
+        border: 1px solid #374151;
+    }
+    :global(.markdown-content pre code) {
+        background-color: transparent;
+        padding: 0;
+        color: #e5e7eb; /* gray-200 */
+    }
+    :global(.markdown-content blockquote) {
+        border-left: 4px solid #4b5563; /* gray-600 */
+        padding-left: 1em;
+        color: #9ca3af; /* gray-400 */
+        font-style: italic;
+        margin-bottom: 0.5em;
+    }
+    :global(.markdown-content a) {
+        color: #fb923c;
+        text-decoration: underline;
+    }
+    :global(.markdown-content hr) {
+        border-color: #4b5563;
+        margin: 1em 0;
+    }
+</style>

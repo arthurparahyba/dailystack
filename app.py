@@ -52,6 +52,6 @@ if __name__ == '__main__':
     t_server.start()
 
     # Create WebView window
-    webview.create_window('DevFlashcards', 'http://127.0.0.1:5000', width=1200, height=800, resizable=True)
+    webview.create_window('Dailystack', 'http://127.0.0.1:5000', width=1200, height=800, resizable=True)
     # Disable debug mode when running as packaged executable
     webview.start(debug=not is_packaged)

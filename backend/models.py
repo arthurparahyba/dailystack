@@ -8,6 +8,22 @@ import uuid
 
 
 @dataclass
+class Agent:
+    """Represents a GenAI Agent."""
+    id: str
+    name: str
+
+
+@dataclass
+class AgentCreationRequest:
+    """Request to create a new GenAI Agent."""
+    name: str
+    description: str
+    prompt: str
+    output_schema: Optional[dict] = field(default=None)
+
+
+@dataclass
 class Flashcard:
     """Represents a single flashcard."""
     question: str
